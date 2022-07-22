@@ -1,7 +1,7 @@
 source:
   connection_uri: $DATABASE_URL
   tables:
-    - providers
+    - orders
     # - name: providers
     #   transform:
     #     - identifier: random

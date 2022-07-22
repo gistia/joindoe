@@ -6,6 +6,7 @@ use std::env;
 use std::io::BufReader;
 use std::result::Result;
 use std::time::Instant;
+use tempfile::NamedTempFile;
 use tokio_postgres::{Error, NoTls};
 
 mod config;
@@ -51,6 +52,8 @@ async fn transform(config: &Config) -> Result<(), Error> {
     let bucket = Bucket::new(&store.bucket, region, credentials).unwrap();
 
     for table in tables {
+        let now = Instant::now();
+
         let results = bucket
             .list(format!("in/{}_", table), Some("/".to_string()))
             .await
@@ -69,11 +72,31 @@ async fn transform(config: &Config) -> Result<(), Error> {
             let res = bucket.get_object(result.key.clone()).await.unwrap();
             let buf_reader = BufReader::new(res.bytes());
             let mut reader = csv::Reader::from_reader(buf_reader);
+
+            let file = NamedTempFile::new().unwrap();
+            let path = file.path();
+            let mut writer = csv::Writer::from_writer(file.reopen().unwrap());
+
             for result in reader.records() {
                 let record = result.unwrap();
-                log::info!("{:?}", record);
+                writer.write_record(record.iter()).unwrap();
             }
+
+            writer.flush().unwrap();
+
+            bucket
+                .put_object(&format!("out/{}.csv", table), &std::fs::read(path).unwrap())
+                .await
+                .unwrap();
         }
+
+        let elapsed = now.elapsed();
+        log::info!(
+            "Finished collecting {} in {}.{:02}s",
+            table,
+            elapsed.as_secs(),
+            elapsed.subsec_micros()
+        );
     }
 
     Ok(())
@@ -116,7 +139,7 @@ async fn collect(config: &Config) -> Result<(), Error> {
             r#"
                 UNLOAD ('SELECT {} FROM {}') TO 's3://{}/in/{}_'
                 CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
-                PARQUET ALLOWOVERWRITE PARALLEL OFF;
+                CSV ALLOWOVERWRITE PARALLEL OFF;
             "#,
             fields.join(", "),
             table,
@@ -130,54 +153,12 @@ async fn collect(config: &Config) -> Result<(), Error> {
         client.execute(sql, &[]).await?;
         let elapsed = now.elapsed();
         log::info!(
-            "Finished {} in {}.{:02}s",
+            "Finished processing {} in {}.{:02}s",
             table,
             elapsed.as_secs(),
             elapsed.subsec_micros()
         );
     }
-
-    Ok(())
-}
-
-async fn _old_main() -> Result<(), Error> {
-    dotenv::dotenv().ok();
-
-    println!("DATABAE_URL: {}", env::var("DATABASE_URL").unwrap());
-
-    let (client, connection) =
-        tokio_postgres::connect(&env::var("DATABASE_URL").unwrap(), NoTls).await?;
-
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    let count: i64 = client
-        .query_one("SELECT COUNT(*) FROM providers", &[])
-        .await
-        .unwrap()
-        .get(0);
-
-    println!("{} providers", count);
-
-    let res = client
-        .execute(
-            &format!(
-                r#"
-                    UNLOAD ('SELECT * FROM providers') TO 's3://nw-data-transfer/providers_'
-                    CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
-                    DELIMITER AS ',' ALLOWOVERWRITE;
-                "#,
-                env::var("AWS_ACCESS_KEY_ID").unwrap(),
-                env::var("AWS_SECRET_ACCESS_KEY").unwrap()
-            ),
-            &[],
-        )
-        .await?;
-
-    println!("{:?}", res);
 
     Ok(())
 }

@@ -693,6 +693,7 @@ dependencies = [
  "rust-s3",
  "serde",
  "serde_yaml",
+ "tempfile",
  "tokio",
  "tokio-postgres",
 ]
