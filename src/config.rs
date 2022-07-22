@@ -1,12 +1,20 @@
 use std::{env, fs};
 
 use serde::{Deserialize, Serialize};
-use serde_yaml::Mapping;
+
+use crate::transformer::{ReverseTransformer, Transformer};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Transformation {
+    pub column: String,
+    #[serde(flatten)]
+    pub transformer: TransformerType,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Table {
     pub name: String,
-    pub transform: Mapping,
+    pub transform: Option<Vec<Transformation>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -32,6 +40,23 @@ pub struct Config {
     pub source: Source,
     pub store: Store,
     pub destination: Destination,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+#[serde(tag = "transformer")]
+pub enum TransformerType {
+    Reverse,
+    // FirstName,
+    // LastName
+}
+
+impl TransformerType {
+    pub fn transformer(&self) -> Box<dyn Transformer> {
+        match self {
+            TransformerType::Reverse => Box::new(ReverseTransformer::default()),
+        }
+    }
 }
 
 fn replace_env_vars(s: &str) -> String {

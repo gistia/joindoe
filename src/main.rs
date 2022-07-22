@@ -6,6 +6,7 @@ mod collect;
 mod config;
 mod db;
 mod transform;
+mod transformer;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]

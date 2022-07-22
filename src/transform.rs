@@ -1,13 +1,11 @@
-use crate::config::Config;
+use crate::config::{Config, Transformation};
 use crate::db;
 use s3::creds::Credentials;
 use s3::{bucket::Bucket, serde_types::Object};
-use serde_yaml::{Mapping, Value};
 use std::io::BufReader;
 use std::time::Instant;
 use tempfile::NamedTempFile;
 use tokio_postgres::Error;
-use unicode_segmentation::UnicodeSegmentation;
 
 pub async fn transform(config: &Config) -> Result<(), Error> {
     let store = &config.store;
@@ -26,10 +24,17 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
     let bucket = Bucket::new(&store.bucket, region, credentials).unwrap();
 
     for table_obj in tables {
+        let transform_obj = &table_obj.transform;
         let table = &table_obj.name;
+
+        let mut transform = &vec![];
+        if let Some(v) = transform_obj {
+            transform = v;
+        }
+
         let columns = db::Db::new(&config.source.connection_uri)
             .await
-            .columns(table)
+            .columns(&table)
             .await?;
         let now = Instant::now();
 
@@ -42,8 +47,6 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
             log::info!("No records to process, exiting");
             return Ok(());
         }
-
-        let transform = table_obj.transform.clone();
 
         for result in results
             .into_iter()
@@ -86,35 +89,26 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
 }
 
 fn apply_transformations(
-    transformations: &Mapping,
+    transformations: &Vec<Transformation>,
     data: Vec<&str>,
     columns: Vec<String>,
 ) -> Vec<String> {
     let mut trdata = vec![];
+
     for (i, column) in columns.iter().enumerate() {
         let value = data[i];
-        let transform = transformations.get(&Value::String(column.to_owned()));
 
-        if transform.is_none() {
-            trdata.push(value.to_owned());
+        let transformation = transformations.iter().find(|t| t.column == *column);
+        if transformation.is_none() {
+            trdata.push(value.to_string());
             continue;
         }
 
-        let transform = transform.unwrap().as_str().unwrap();
-        println!("{} {}", transform, value);
+        let transformation = transformation.unwrap();
+        let transformer = transformation.transformer.transformer();
+        let trvalue = transformer.transform(value);
 
-        let tvalue = match transform {
-            "reverse" => value.graphemes(true).rev().collect::<String>(),
-            "first-name" => "First".to_owned(),
-            "last-name" => "Last".to_owned(),
-            t => unimplemented!(
-                "Unimplemented transformation of type {} for column {}",
-                t,
-                column
-            ),
-        };
-
-        trdata.push(tvalue.clone());
+        trdata.push(trvalue.clone());
     }
 
     trdata
@@ -122,26 +116,16 @@ fn apply_transformations(
 
 #[cfg(test)]
 mod tests {
+    use crate::config::TransformerType;
+
     use super::*;
-    use serde_yaml::Value;
-
-    fn make_transformations(maps: Vec<(&str, &str)>) -> Mapping {
-        let mut m = Mapping::new();
-
-        for (k, v) in maps {
-            m.insert(Value::String(k.to_string()), Value::String(v.to_string()));
-        }
-
-        m
-    }
 
     #[test]
     fn test_apply_transformations() {
-        let transformations = make_transformations(vec![
-            ("first", "first-name"),
-            ("last", "last-name"),
-            ("identifier", "reverse"),
-        ]);
+        let transformations = vec![Transformation {
+            column: "identifier".to_string(),
+            transformer: TransformerType::Reverse,
+        }];
         println!("{:?}", transformations);
         let data = apply_transformations(
             &transformations,
@@ -152,6 +136,6 @@ mod tests {
                 "last".to_owned(),
             ],
         );
-        assert_eq!(data, vec!["9673464811", "Moore", "Martin"]);
+        assert_eq!(data, vec!["9673464811", "Martin", "Moore"]);
     }
 }

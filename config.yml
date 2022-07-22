@@ -3,7 +3,9 @@ source:
   tables:
     - name: providers
       transform:
-          identifier: reverse
+          - column: identifier
+            transformer: reverse
+
           # first_name: first-name
           # last_name: last-name
 store:
