@@ -1,15 +1,11 @@
 use clap::Parser;
-use config::Config;
-use s3::creds::Credentials;
-use s3::{bucket::Bucket, serde_types::Object};
-use std::env;
-use std::io::BufReader;
 use std::result::Result;
-use std::time::Instant;
-use tempfile::NamedTempFile;
-use tokio_postgres::{Error, NoTls};
+use tokio_postgres::Error;
 
+mod collect;
 mod config;
+mod db;
+mod transform;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -29,136 +25,8 @@ async fn main() -> Result<(), Error> {
     let args = Args::parse();
 
     let config = config::Config::new(&args.config.unwrap());
-    let _result = collect(&config).await;
-    let _transform = transform(&config).await;
-
-    Ok(())
-}
-
-async fn transform(config: &Config) -> Result<(), Error> {
-    let store = &config.store;
-    let tables = &config.source.tables;
-
-    let credentials = Credentials::new(
-        Some(&store.aws_access_key_id.clone()),
-        Some(&store.aws_secret_access_key.clone()),
-        None,
-        None,
-        None,
-    )
-    .unwrap();
-
-    let region = "us-east-1".parse().unwrap();
-    let bucket = Bucket::new(&store.bucket, region, credentials).unwrap();
-
-    for table in tables {
-        let now = Instant::now();
-
-        let results = bucket
-            .list(format!("in/{}_", table), Some("/".to_string()))
-            .await
-            .unwrap();
-
-        if results.len() < 1 {
-            log::info!("No records to process, exiting");
-            return Ok(());
-        }
-
-        for result in results
-            .into_iter()
-            .flat_map(|r| r.contents)
-            .collect::<Vec<Object>>()
-        {
-            let res = bucket.get_object(result.key.clone()).await.unwrap();
-            let buf_reader = BufReader::new(res.bytes());
-            let mut reader = csv::Reader::from_reader(buf_reader);
-
-            let file = NamedTempFile::new().unwrap();
-            let path = file.path();
-            let mut writer = csv::Writer::from_writer(file.reopen().unwrap());
-
-            for result in reader.records() {
-                let record = result.unwrap();
-                writer.write_record(record.iter()).unwrap();
-            }
-
-            writer.flush().unwrap();
-
-            bucket
-                .put_object(&format!("out/{}.csv", table), &std::fs::read(path).unwrap())
-                .await
-                .unwrap();
-        }
-
-        let elapsed = now.elapsed();
-        log::info!(
-            "Finished collecting {} in {}.{:02}s",
-            table,
-            elapsed.as_secs(),
-            elapsed.subsec_micros()
-        );
-    }
-
-    Ok(())
-}
-
-async fn collect(config: &Config) -> Result<(), Error> {
-    let source = &config.source;
-    let (client, connection) = tokio_postgres::connect(&source.connection_uri, NoTls).await?;
-
-    let sanitized_url = source.connection_uri.split("@").collect::<Vec<_>>()[1];
-    log::debug!("Connecting to source: postgres://*****@{}", sanitized_url);
-
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
-
-    println!("source = {:#?}", source);
-    for table in &source.tables {
-        log::debug!("Started processing table {}", table);
-
-        let count = client
-            .query_one(&format!("SELECT COUNT(*) FROM {}", table), &[])
-            .await?;
-        let count: i64 = count.get(0);
-
-        log::debug!("Processing table {} with {} rows", table, count);
-
-        let fields = client
-            .query(
-                "SELECT column_name FROM information_schema.columns WHERE table_name = $1",
-                &[&table],
-            )
-            .await?;
-        let fields: Vec<String> = fields.iter().map(|row| row.get(0)).collect();
-
-        let now = Instant::now();
-        let sql = &format!(
-            r#"
-                UNLOAD ('SELECT {} FROM {}') TO 's3://{}/in/{}_'
-                CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
-                CSV ALLOWOVERWRITE PARALLEL OFF;
-            "#,
-            fields.join(", "),
-            table,
-            config.store.bucket,
-            table,
-            env::var("AWS_ACCESS_KEY_ID").unwrap(),
-            env::var("AWS_SECRET_ACCESS_KEY").unwrap()
-        );
-
-        println!("sql = {}", sql);
-        client.execute(sql, &[]).await?;
-        let elapsed = now.elapsed();
-        log::info!(
-            "Finished processing {} in {}.{:02}s",
-            table,
-            elapsed.as_secs(),
-            elapsed.subsec_micros()
-        );
-    }
+    let _result = collect::collect(&config).await;
+    let _transform = transform::transform(&config).await;
 
     Ok(())
 }

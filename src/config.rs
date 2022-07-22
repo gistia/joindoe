@@ -1,11 +1,18 @@
 use std::{env, fs};
 
 use serde::{Deserialize, Serialize};
+use serde_yaml::Mapping;
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Table {
+    pub name: String,
+    pub transform: Mapping,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Source {
     pub connection_uri: String,
-    pub tables: Vec<String>,
+    pub tables: Vec<Table>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -51,7 +58,8 @@ mod tests {
 
     #[test]
     fn test_config() {
-        Config::new("config.yml");
+        let config = Config::new("config.yml");
+        println!("{:#?}", config);
     }
 
     #[test]

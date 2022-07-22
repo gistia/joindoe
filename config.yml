@@ -1,12 +1,11 @@
 source:
   connection_uri: $DATABASE_URL
   tables:
-    - orders
-    # - name: providers
-    #   transform:
-    #     - identifier: random
-    #     - first_name: first-name
-    #     - last_name: last-name
+    - name: providers
+      transform:
+        - identifier: reverse
+          first_name: first-name
+          last_name: last-name
 store:
   bucket: nw-data-transfer
   aws_access_key_id: $AWS_ACCESS_KEY_ID
