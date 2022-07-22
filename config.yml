@@ -3,9 +3,9 @@ source:
   tables:
     - name: providers
       transform:
-        - identifier: reverse
-          first_name: first-name
-          last_name: last-name
+          identifier: reverse
+          # first_name: first-name
+          # last_name: last-name
 store:
   bucket: nw-data-transfer
   aws_access_key_id: $AWS_ACCESS_KEY_ID

@@ -93,11 +93,14 @@ fn apply_transformations(
     let mut trdata = vec![];
     for (i, column) in columns.iter().enumerate() {
         let value = data[i];
-        let transform = transformations
-            .get(&Value::String(column.to_owned()))
-            .unwrap()
-            .as_str()
-            .unwrap();
+        let transform = transformations.get(&Value::String(column.to_owned()));
+
+        if transform.is_none() {
+            trdata.push(value.to_owned());
+            continue;
+        }
+
+        let transform = transform.unwrap().as_str().unwrap();
         println!("{} {}", transform, value);
 
         let tvalue = match transform {
