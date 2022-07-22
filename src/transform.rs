@@ -39,7 +39,7 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
         let now = Instant::now();
 
         let results = bucket
-            .list(format!("in/{}_", table), Some("/".to_string()))
+            .list(format!("in/{}_000", table), Some("/".to_string()))
             .await
             .unwrap();
 
@@ -53,6 +53,11 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
             .flat_map(|r| r.contents)
             .collect::<Vec<Object>>()
         {
+            log::debug!(
+                "Reading from s3://{}/{}...",
+                store.bucket,
+                result.key.clone()
+            );
             let res = bucket.get_object(result.key.clone()).await.unwrap();
             let buf_reader = BufReader::new(res.bytes());
             let mut reader = csv::Reader::from_reader(buf_reader);
@@ -70,6 +75,7 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
 
             writer.flush().unwrap();
 
+            log::debug!("Writing to s3://{}/out/{}.csv", store.bucket, table);
             bucket
                 .put_object(&format!("out/{}.csv", table), &std::fs::read(path).unwrap())
                 .await

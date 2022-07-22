@@ -1,5 +1,4 @@
 [package]
-author = "Felipe Coury <felipe.coury@gmail.com>"
 description = "Utility to deidentify sensitive data."
 edition = "2021"
 name = "joindoe"

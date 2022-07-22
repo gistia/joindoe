@@ -8,7 +8,7 @@ mod transform;
 mod transformer;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about)]
+#[clap(author = "Felipe Coury <felipe.coury@gmail.com>", version, about)]
 struct Args {
     // Configuration file
     #[clap(short, long)]
@@ -21,16 +21,23 @@ struct Args {
     // Skips the transformation stage
     #[clap(long)]
     skip_transform: bool,
+
+    // Shows debugging information
+    #[clap(short, long)]
+    debug: bool,
 }
 
 #[tokio::main]
 async fn main() -> () {
     dotenv::dotenv().ok();
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    );
 
     let args = Args::parse();
+
+    let log_level = if args.debug { "joindoe=debug" } else { "info" };
+
+    env_logger::init_from_env(
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level),
+    );
 
     let config = config::Config::new(&args.config);
     if !args.skip_collect {

@@ -13,6 +13,7 @@ pub async fn load(config: &Config) {
     );
 
     for table in &src_def.tables {
+        log::info!("Loading table {}...", table.name);
         let now = Instant::now();
         let columns = source.columns(&table.name).await.unwrap();
 
@@ -29,6 +30,8 @@ pub async fn load(config: &Config) {
             config.store.aws_access_key_id,
             config.store.aws_secret_access_key,
         );
+
+        log::debug!("SQL[{}] = {}", table.name, sql);
 
         destination
             .exec(format!("TRUNCATE TABLE {}", table.name).as_str())
