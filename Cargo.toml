@@ -1,5 +1,6 @@
 [package]
-description = "Redshift data dumper and anonymizer."
+author = "Felipe Coury <felipe.coury@gmail.com>"
+description = "Utility to deidentify sensitive data."
 edition = "2021"
 name = "join-doe"
 version = "0.1.0"

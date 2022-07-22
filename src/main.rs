@@ -14,7 +14,7 @@ mod transformer;
 struct Args {
     // Configuration file
     #[clap(short, long)]
-    config: Option<String>,
+    config: String,
 }
 
 #[tokio::main]
@@ -26,7 +26,7 @@ async fn main() -> Result<(), Error> {
 
     let args = Args::parse();
 
-    let config = config::Config::new(&args.config.unwrap());
+    let config = config::Config::new(&args.config);
     let _result = collect::collect(&config).await;
     let _transform = transform::transform(&config).await;
     let _load = loader::load(&config).await;
