@@ -4,6 +4,7 @@ description = "Utility to deidentify sensitive data"
 edition = "2021"
 license = "Apache-2.0"
 name = "joindoe"
+repository = "https://github.com/gistia/johndoe"
 version = "0.1.0"
 
 [dependencies]
