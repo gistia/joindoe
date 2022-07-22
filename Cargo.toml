@@ -1,7 +1,7 @@
 [package]
 description = "Redshift data dumper and anonymizer."
 edition = "2021"
-name = "lix"
+name = "join-doe"
 version = "0.1.0"
 
 [dependencies]

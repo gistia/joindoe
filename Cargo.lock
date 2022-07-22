@@ -664,6 +664,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112c678d4050afce233f4f2852bb2eb519230b3cf12f33585275537d7e41578d"
 
 [[package]]
+name = "join-doe"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "csv",
+ "dotenv",
+ "env_logger",
+ "fake",
+ "log",
+ "rand",
+ "rust-s3",
+ "serde",
+ "serde_yaml",
+ "tempfile",
+ "tokio",
+ "tokio-postgres",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -689,26 +709,6 @@ name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
-
-[[package]]
-name = "lix"
-version = "0.1.0"
-dependencies = [
- "clap",
- "csv",
- "dotenv",
- "env_logger",
- "fake",
- "log",
- "rand",
- "rust-s3",
- "serde",
- "serde_yaml",
- "tempfile",
- "tokio",
- "tokio-postgres",
- "unicode-segmentation",
-]
 
 [[package]]
 name = "lock_api"
