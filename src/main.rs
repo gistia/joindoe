@@ -10,19 +10,19 @@ mod transformer;
 #[derive(Parser, Debug)]
 #[clap(author = "Felipe Coury <felipe.coury@gmail.com>", version, about)]
 struct Args {
-    // Configuration file
+    /// Configuration file
     #[clap(short, long)]
     config: String,
 
-    // Skips the collection stage
+    /// Skip the collection stage
     #[clap(long)]
     skip_collect: bool,
 
-    // Skips the transformation stage
+    /// Skip the transformation stage
     #[clap(long)]
     skip_transform: bool,
 
-    // Shows debugging information
+    /// Show debugging information
     #[clap(short, long)]
     debug: bool,
 }
