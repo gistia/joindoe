@@ -1,0 +1,15 @@
+source:
+  connection_uri: $DATABASE_URL
+  tables:
+    - providers
+    # - name: providers
+    #   transform:
+    #     - identifier: random
+    #     - first_name: first-name
+    #     - last_name: last-name
+store:
+  bucket: nw-data-transfer
+  aws_access_key_id: $AWS_ACCESS_KEY_ID
+  aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+destination:
+  connection_uri: postgres:://postgres:postgres@localhost:5432/northwest
