@@ -1,11 +1,9 @@
 use clap::Parser;
-use config::{Config, Source};
-use parquet::file::reader::{FileReader, SerializedFileReader};
+use config::Config;
 use s3::creds::Credentials;
 use s3::{bucket::Bucket, serde_types::Object};
 use std::env;
-use std::fs;
-use std::fs::File;
+use std::io::BufReader;
 use std::result::Result;
 use std::time::Instant;
 use tokio_postgres::{Error, NoTls};
@@ -30,7 +28,7 @@ async fn main() -> Result<(), Error> {
     let args = Args::parse();
 
     let config = config::Config::new(&args.config.unwrap());
-    let _result = collect_data(&config.source).await;
+    let _result = collect(&config).await;
     let _transform = transform(&config).await;
 
     Ok(())
@@ -54,25 +52,26 @@ async fn transform(config: &Config) -> Result<(), Error> {
 
     for table in tables {
         let results = bucket
-            .list(format!("{}_", table), Some("/".to_string()))
+            .list(format!("in/{}_", table), Some("/".to_string()))
             .await
             .unwrap();
 
-        println!("results = {:#?}", results);
+        if results.len() < 1 {
+            log::info!("No records to process, exiting");
+            return Ok(());
+        }
+
         for result in results
             .into_iter()
             .flat_map(|r| r.contents)
             .collect::<Vec<Object>>()
         {
             let res = bucket.get_object(result.key.clone()).await.unwrap();
-            fs::write(result.key.clone(), res.bytes()).unwrap();
-            let file = File::open(result.key.clone()).unwrap();
-            let reader = SerializedFileReader::new(file).unwrap();
-            let metadata = reader.metadata();
-            println!("metadata = {:#?}", metadata);
-
-            for row in reader.into_iter() {
-                println!("row = {:#?}", row);
+            let buf_reader = BufReader::new(res.bytes());
+            let mut reader = csv::Reader::from_reader(buf_reader);
+            for result in reader.records() {
+                let record = result.unwrap();
+                log::info!("{:?}", record);
             }
         }
     }
@@ -80,7 +79,8 @@ async fn transform(config: &Config) -> Result<(), Error> {
     Ok(())
 }
 
-async fn collect_data(source: &Source) -> Result<(), Error> {
+async fn collect(config: &Config) -> Result<(), Error> {
+    let source = &config.source;
     let (client, connection) = tokio_postgres::connect(&source.connection_uri, NoTls).await?;
 
     let sanitized_url = source.connection_uri.split("@").collect::<Vec<_>>()[1];
@@ -114,11 +114,14 @@ async fn collect_data(source: &Source) -> Result<(), Error> {
         let now = Instant::now();
         let sql = &format!(
             r#"
-                UNLOAD ('SELECT {} FROM providers') TO 's3://nw-data-transfer/providers_'
+                UNLOAD ('SELECT {} FROM {}') TO 's3://{}/in/{}_'
                 CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
                 PARQUET ALLOWOVERWRITE PARALLEL OFF;
             "#,
             fields.join(", "),
+            table,
+            config.store.bucket,
+            table,
             env::var("AWS_ACCESS_KEY_ID").unwrap(),
             env::var("AWS_SECRET_ACCESS_KEY").unwrap()
         );
