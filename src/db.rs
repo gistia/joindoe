@@ -54,7 +54,7 @@ impl Db {
             r#"
                 UNLOAD ('SELECT {} FROM {}') TO 's3://{}/in/{}_'
                 CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
-                CSV ALLOWOVERWRITE PARALLEL OFF;
+                CSV HEADER ALLOWOVERWRITE PARALLEL OFF;
             "#,
             columns.join(", "),
             table,
@@ -65,7 +65,10 @@ impl Db {
             env::var("AWS_SECRET_ACCESS_KEY").unwrap()
         );
 
-        println!("sql = {}", sql);
         Ok(self.client.execute(sql, &[]).await?)
+    }
+
+    pub async fn exec(&self, sql: &str) -> Result<u64, Error> {
+        self.client.execute(sql, &[]).await
     }
 }

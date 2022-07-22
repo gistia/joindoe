@@ -126,7 +126,6 @@ mod tests {
             column: "identifier".to_string(),
             transformer: TransformerType::Reverse,
         }];
-        println!("{:?}", transformations);
         let data = apply_transformations(
             &transformations,
             vec!["1184643769", "Martin", "Moore"],

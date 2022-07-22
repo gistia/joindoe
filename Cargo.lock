@@ -316,6 +316,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fake"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d68f517805463f3a896a9d29c1d6ff09d3579ded64a7201b4069f8f9c0d52fd"
+dependencies = [
+ "rand",
+]
+
+[[package]]
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -689,7 +698,9 @@ dependencies = [
  "csv",
  "dotenv",
  "env_logger",
+ "fake",
  "log",
+ "rand",
  "rust-s3",
  "serde",
  "serde_yaml",

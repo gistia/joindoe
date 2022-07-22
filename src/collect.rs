@@ -11,7 +11,6 @@ pub async fn collect(config: &Config) -> Result<(), Error> {
         db.sanitized_uri()
     );
 
-    println!("source = {:#?}", source);
     for table_obj in &source.tables {
         let table = &table_obj.name;
         log::debug!("Started processing table {}", table);

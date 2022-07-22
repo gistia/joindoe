@@ -5,12 +5,18 @@ source:
       transform:
           - column: identifier
             transformer: reverse
+          - column: first_name
+            transformer: first-name
+          - column: last_name
+            transformer: last-name
+    - name: orders
+      transform:
+          - column: identifier
+            transformer: reverse
 
-          # first_name: first-name
-          # last_name: last-name
 store:
   bucket: nw-data-transfer
   aws_access_key_id: $AWS_ACCESS_KEY_ID
   aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
 destination:
-  connection_uri: postgres:://postgres:postgres@localhost:5432/northwest
+  connection_uri: $TARGET_DATABASE_URL

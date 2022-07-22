@@ -5,6 +5,7 @@ use tokio_postgres::Error;
 mod collect;
 mod config;
 mod db;
+mod loader;
 mod transform;
 mod transformer;
 
@@ -28,6 +29,7 @@ async fn main() -> Result<(), Error> {
     let config = config::Config::new(&args.config.unwrap());
     let _result = collect::collect(&config).await;
     let _transform = transform::transform(&config).await;
+    let _load = loader::load(&config).await;
 
     Ok(())
 }

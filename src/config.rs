@@ -2,7 +2,9 @@ use std::{env, fs};
 
 use serde::{Deserialize, Serialize};
 
-use crate::transformer::{ReverseTransformer, Transformer};
+use crate::transformer::{
+    FirstNameTransformer, LastNameTransformer, ReverseTransformer, Transformer,
+};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Transformation {
@@ -47,14 +49,16 @@ pub struct Config {
 #[serde(tag = "transformer")]
 pub enum TransformerType {
     Reverse,
-    // FirstName,
-    // LastName
+    FirstName,
+    LastName,
 }
 
 impl TransformerType {
     pub fn transformer(&self) -> Box<dyn Transformer> {
         match self {
             TransformerType::Reverse => Box::new(ReverseTransformer::default()),
+            TransformerType::FirstName => Box::new(FirstNameTransformer::default()),
+            TransformerType::LastName => Box::new(LastNameTransformer::default()),
         }
     }
 }
