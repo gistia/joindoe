@@ -8,7 +8,7 @@ mod transform;
 mod transformer;
 
 #[derive(Parser, Debug)]
-#[clap(author = "Felipe Coury <felipe.coury@gmail.com>", version, about)]
+#[clap(author, version, about)]
 struct Args {
     /// Configuration file
     #[clap(short, long)]

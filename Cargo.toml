@@ -1,6 +1,8 @@
 [package]
-description = "Utility to deidentify sensitive data."
+authors = ["Felipe Coury <felipe.coury@gmail.com>"]
+description = "Utility to deidentify sensitive data"
 edition = "2021"
+license = "Apache-2.0"
 name = "joindoe"
 version = "0.1.0"
 
