@@ -1,12 +1,17 @@
 use clap::Parser;
-use config::{Config, Source};
+use config::Config;
+use parquet::column::writer::ColumnWriter;
+use parquet::data_type::{Int96, Int96Type};
 use parquet::file::reader::{FileReader, SerializedFileReader};
+use parquet::file::{properties::WriterProperties, writer::SerializedFileWriter};
+use parquet::record::Field;
 use s3::creds::Credentials;
 use s3::{bucket::Bucket, serde_types::Object};
 use std::env;
 use std::fs;
 use std::fs::File;
 use std::result::Result;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio_postgres::{Error, NoTls};
 
@@ -30,10 +35,26 @@ async fn main() -> Result<(), Error> {
     let args = Args::parse();
 
     let config = config::Config::new(&args.config.unwrap());
-    let _result = collect_data(&config.source).await;
+    // let _result = collect(&config).await;
     let _transform = transform(&config).await;
 
     Ok(())
+}
+
+/// Converts this INT96 into an i64 representing the number of MILLISECONDS since Epoch
+pub fn from_i64(milliseconds: i64) -> Int96 {
+    const JULIAN_DAY_OF_EPOCH: i64 = 2_440_588;
+    const SECONDS_PER_DAY: i64 = 86_400;
+    const MILLIS_PER_SECOND: i64 = 1_000;
+
+    let day = milliseconds / MILLIS_PER_SECOND / SECONDS_PER_DAY + JULIAN_DAY_OF_EPOCH;
+    let nanoseconds = (milliseconds % MILLIS_PER_SECOND) * 1_000_000;
+
+    let mut int96 = Int96::new();
+    int96.set_data(nanoseconds as u32, (nanoseconds >> 32) as u32, day as u32);
+    println!("value: {}", milliseconds);
+    println!("int96: {}", int96.to_i64());
+    int96
 }
 
 async fn transform(config: &Config) -> Result<(), Error> {
@@ -54,33 +75,103 @@ async fn transform(config: &Config) -> Result<(), Error> {
 
     for table in tables {
         let results = bucket
-            .list(format!("{}_", table), Some("/".to_string()))
+            .list(format!("in/{}_", table), Some("/".to_string()))
             .await
             .unwrap();
 
-        println!("results = {:#?}", results);
+        if results.len() < 1 {
+            log::info!("No records to process, exiting");
+            return Ok(());
+        }
+
         for result in results
             .into_iter()
             .flat_map(|r| r.contents)
             .collect::<Vec<Object>>()
         {
             let res = bucket.get_object(result.key.clone()).await.unwrap();
-            fs::write(result.key.clone(), res.bytes()).unwrap();
-            let file = File::open(result.key.clone()).unwrap();
-            let reader = SerializedFileReader::new(file).unwrap();
+
+            let file_name = result.key.split("/").collect::<Vec<&str>>()[1];
+            fs::write(file_name, res.bytes()).unwrap();
+
+            let in_file = File::open(file_name).unwrap();
+            let reader = SerializedFileReader::new(in_file).unwrap();
             let metadata = reader.metadata();
             println!("metadata = {:#?}", metadata);
 
+            let out_file_name = format!("out_{}", file_name);
+            let out_file = File::create(out_file_name).unwrap();
+            let props = Arc::new(WriterProperties::builder().build());
+            let schema = Arc::new(metadata.file_metadata().schema().clone());
+            let mut writer = SerializedFileWriter::new(out_file, schema, props).unwrap();
+
             for row in reader.into_iter() {
-                println!("row = {:#?}", row);
+                let mut row_group_writer = writer.next_row_group().unwrap();
+                for col in row.get_column_iter() {
+                    if let Some(mut col_writer) = row_group_writer.next_column().unwrap() {
+                        match col_writer.untyped() {
+                            ColumnWriter::BoolColumnWriter(ref mut cw) => {
+                                if let Field::Bool(b) = col.1 {
+                                    cw.write_batch(&[b.to_owned()], None, None).unwrap();
+                                }
+                            }
+                            ColumnWriter::Int32ColumnWriter(ref mut cw) => {
+                                if let Field::Int(i) = col.1 {
+                                    cw.write_batch(&[i.to_owned()], None, None).unwrap();
+                                }
+                            }
+                            ColumnWriter::Int64ColumnWriter(ref mut cw) => {
+                                if let Field::Int(i) = col.1 {
+                                    cw.write_batch(&[i.to_owned().try_into().unwrap()], None, None)
+                                        .unwrap();
+                                }
+                            }
+                            ColumnWriter::Int96ColumnWriter(ref mut cw) => {
+                                if let Field::TimestampMillis(i) = col.1 {
+                                    cw.write_batch(&[from_i64(i.clone() as i64)], None, None)
+                                        .unwrap();
+                                }
+                            }
+                            ColumnWriter::FloatColumnWriter(ref mut cw) => {
+                                if let Field::Float(f) = col.1 {
+                                    cw.write_batch(&[f.to_owned()], None, None).unwrap();
+                                }
+                            }
+                            ColumnWriter::DoubleColumnWriter(ref mut cw) => {
+                                if let Field::Double(f) = col.1 {
+                                    cw.write_batch(&[f.to_owned()], None, None).unwrap();
+                                }
+                            }
+                            ColumnWriter::ByteArrayColumnWriter(ref mut cw) => {
+                                if let Field::Bytes(b) = col.1 {
+                                    cw.write_batch(&[b.to_owned()], None, None).unwrap();
+                                }
+                            }
+                            ColumnWriter::FixedLenByteArrayColumnWriter(ref mut cw) => {
+                                println!("FixedLenByteArray col = {:#?}", col);
+
+                                // if let Field::FixedLenBytes(b) = col.1 {
+                                //     cw.write_batch(&[b.to_owned()], None, None).unwrap();
+                                // }
+                            }
+                            _ => {
+                                log::error!("unhandled column type for {}:\n{:#?}", col.0, col.1);
+                            }
+                        }
+                        col_writer.close().unwrap();
+                    }
+                }
+                row_group_writer.close().unwrap();
             }
+            writer.close().unwrap();
         }
     }
 
     Ok(())
 }
 
-async fn collect_data(source: &Source) -> Result<(), Error> {
+async fn collect(config: &Config) -> Result<(), Error> {
+    let source = &config.source;
     let (client, connection) = tokio_postgres::connect(&source.connection_uri, NoTls).await?;
 
     let sanitized_url = source.connection_uri.split("@").collect::<Vec<_>>()[1];
@@ -114,11 +205,14 @@ async fn collect_data(source: &Source) -> Result<(), Error> {
         let now = Instant::now();
         let sql = &format!(
             r#"
-                UNLOAD ('SELECT {} FROM providers') TO 's3://nw-data-transfer/providers_'
+                UNLOAD ('SELECT {} FROM {}') TO 's3://{}/in/{}_'
                 CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
                 PARQUET ALLOWOVERWRITE PARALLEL OFF;
             "#,
             fields.join(", "),
+            table,
+            config.store.bucket,
+            table,
             env::var("AWS_ACCESS_KEY_ID").unwrap(),
             env::var("AWS_SECRET_ACCESS_KEY").unwrap()
         );
