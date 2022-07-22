@@ -20,7 +20,7 @@ pub async fn load(config: &Config) {
             r#"
                 COPY {}({}) FROM 's3://{}/out/{}.csv'
                 CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
-                CSV BLANKSASNULL;
+                CSV BLANKSASNULL EXPLICIT_IDS;
             "#,
             table.name,
             columns.join(", "),
