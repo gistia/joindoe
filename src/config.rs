@@ -7,6 +7,37 @@ use crate::transformer::{
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Config {
+    pub source: Source,
+    pub store: Store,
+    pub destination: Destination,
+    pub postprocess: Option<Vec<PostProcessTask>>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(tag = "task", content = "properties")]
+pub enum TaskType {
+    Pdf(PdfConfig),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct PdfConfig {
+    pub bucket: String,
+    pub from: String,
+    pub file_name: String,
+    pub aws_access_key_id: String,
+    pub aws_secret_access_key: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct PostProcessTask {
+    pub name: String,
+    #[serde(flatten)]
+    pub task: TaskType,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Transformation {
     pub column: String,
     #[serde(flatten)]
@@ -35,13 +66,6 @@ pub struct Store {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Destination {
     pub connection_uri: String,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Config {
-    pub source: Source,
-    pub store: Store,
-    pub destination: Destination,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -77,7 +101,11 @@ fn replace_env_vars(s: &str) -> String {
 impl Config {
     pub fn new(file: &str) -> Self {
         let config_str = replace_env_vars(&fs::read_to_string(file).unwrap());
-        serde_yaml::from_str(&config_str).unwrap()
+        Self::new_from_str(&config_str)
+    }
+
+    pub fn new_from_str(s: &str) -> Self {
+        serde_yaml::from_str(s).unwrap()
     }
 }
 
@@ -87,8 +115,54 @@ mod tests {
 
     #[test]
     fn test_config() {
-        let config = Config::new("config.yml");
-        println!("{:#?}", config);
+        let str = indoc::indoc! {r#"
+            source:
+                connection_uri: $DATABASE_URL
+                tables:
+                    - name: providers
+                      transform:
+                        - column: identifier
+                          transformer: reverse
+                        - column: first_name
+                          transformer: first-name
+                        - column: last_name
+                          transformer: last-name
+                    - name: insurances
+                    - name: locations
+                    - name: test_definitions
+                    - name: orders
+                      transform:
+                        - column: identifier
+                          transformer: reverse
+                    - name: orders_tests
+
+            store:
+                bucket: nw-data-transfer
+                aws_access_key_id: $AWS_ACCESS_KEY_ID
+                aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+
+            destination:
+                connection_uri: $TEST_DATABASE_URL
+
+            postprocess:
+                - name: Generate results PDF
+                  task: pdf
+                  properties:
+                    bucket: nw-pdf
+                    from: |
+                      SELECT
+                          o.identifier, ot.test_code, p.first_name, p.last_name, p.date_of_birth
+                      FROM
+                          "orders" o
+                          JOIN "orders_tests" ot ON ot.order_id = o.id
+                          JOIN "patients" p ON p.id = o.patient_id
+                    file_name: "{{ identifier }}_{{ test_code }}.pdf"
+                    aws_access_key_id: $AWS_ACCESS_KEY_ID
+                    aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+        "#};
+
+        let config = Config::new_from_str(str);
+        assert_eq!(config.postprocess.unwrap()[0].name, "Generate results PDF");
     }
 
     #[test]

@@ -37,6 +37,10 @@ impl Db {
         Ok(count.get(0))
     }
 
+    pub async fn query(&self, sql: &str) -> Result<Vec<tokio_postgres::Row>, Error> {
+        self.client.query(sql, &[]).await
+    }
+
     pub async fn columns(&self, table: &str) -> Result<Vec<String>, Error> {
         let columns = self
             .client
