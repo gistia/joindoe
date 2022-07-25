@@ -1,5 +1,6 @@
 use crate::config::{Config, Transformation};
 use crate::db;
+use crate::transformer::TransformationContext;
 use s3::creds::Credentials;
 use s3::{bucket::Bucket, serde_types::Object};
 use std::io::BufReader;
@@ -66,10 +67,10 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
             let path = file.path();
             let mut writer = csv::Writer::from_writer(file.reopen().unwrap());
 
-            for result in reader.records() {
+            for (i, result) in reader.records().enumerate() {
                 let record = result.unwrap();
                 let data = record.iter().collect::<Vec<&str>>();
-                let res = apply_transformations(&transform, data, columns.clone());
+                let res = apply_transformations(i, &transform, data, columns.clone());
                 writer.write_record(res).unwrap();
             }
 
@@ -94,7 +95,8 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
     Ok(())
 }
 
-fn apply_transformations(
+pub fn apply_transformations(
+    index: usize,
     transformations: &Vec<Transformation>,
     data: Vec<&str>,
     columns: Vec<String>,
@@ -110,9 +112,16 @@ fn apply_transformations(
             continue;
         }
 
+        let ctx = TransformationContext {
+            index,
+            row: data.clone(),
+            columns: columns.clone(),
+            value: value,
+        };
+
         let transformation = transformation.unwrap();
         let transformer = transformation.transformer.transformer();
-        let trvalue = transformer.transform(value);
+        let trvalue = transformer.transform(&ctx);
 
         trdata.push(trvalue.clone());
     }
@@ -133,6 +142,7 @@ mod tests {
             transformer: TransformerType::Reverse,
         }];
         let data = apply_transformations(
+            1,
             &transformations,
             vec!["1184643769", "Martin", "Moore"],
             vec![

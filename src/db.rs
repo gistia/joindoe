@@ -52,18 +52,23 @@ impl Db {
         Ok(columns.iter().map(|row| row.get(0)).collect())
     }
 
-    pub async fn unload(&self, table: &str, to_bucket: &str) -> Result<u64, Error> {
+    pub async fn unload_table(&self, table: &str, to_bucket: &str) -> Result<u64, Error> {
         let columns = self.columns(table).await?;
+        let sql = format!("SELECT {} FROM {}", columns.join(", "), table);
+        println!(" *** SQL = {}", sql);
+        self.unload(&sql, to_bucket, table).await
+    }
+
+    pub async fn unload(&self, sql: &str, to_bucket: &str, to_file: &str) -> Result<u64, Error> {
         let sql = &format!(
             r#"
-                UNLOAD ('SELECT {} FROM {}') TO 's3://{}/in/{}_'
+                UNLOAD ('{}') TO 's3://{}/in/{}_'
                 CREDENTIALS 'aws_access_key_id={};aws_secret_access_key={}'
                 CSV HEADER ALLOWOVERWRITE PARALLEL OFF;
             "#,
-            columns.join(", "),
-            table,
+            sql,
             to_bucket,
-            table,
+            to_file,
             // FIXME replace with taking a config as param
             env::var("AWS_ACCESS_KEY_ID").unwrap(),
             env::var("AWS_SECRET_ACCESS_KEY").unwrap()

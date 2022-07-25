@@ -1,4 +1,4 @@
-use super::Transformer;
+use super::{TransformationContext, Transformer};
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct ReverseTransformer {}
@@ -18,7 +18,7 @@ impl Transformer for ReverseTransformer {
         "Reverse the contents of the field"
     }
 
-    fn transform(&self, input: &str) -> String {
-        input.graphemes(true).rev().collect::<String>()
+    fn transform(&self, ctx: &TransformationContext) -> String {
+        ctx.value.graphemes(true).rev().collect::<String>()
     }
 }

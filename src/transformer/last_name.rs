@@ -2,7 +2,7 @@ use fake::faker::name::raw::LastName;
 use fake::locales::EN;
 use fake::Fake;
 
-use super::Transformer;
+use super::{TransformationContext, Transformer};
 
 pub struct LastNameTransformer {}
 
@@ -21,7 +21,7 @@ impl Transformer for LastNameTransformer {
         "Replaces the content of the field with a random last name"
     }
 
-    fn transform(&self, _: &str) -> String {
+    fn transform(&self, _: &TransformationContext) -> String {
         LastName(EN).fake()
     }
 }
