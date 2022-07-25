@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use rand_regex::Regex;
 
 use super::{TransformationContext, Transformer};
@@ -24,11 +24,10 @@ impl Transformer for RegexTransformer {
     }
 
     fn transform(&self, _: &TransformationContext) -> String {
-        let mut rng = rand_xorshift::XorShiftRng::from_seed(*b"The initial seed");
-        let samples = (&mut rng)
-            .sample_iter(&self.generator)
+        rand::thread_rng()
+            .sample_iter::<String, _>(&self.generator)
             .take(1)
-            .collect::<Vec<String>>();
-        samples[0].clone()
+            .next()
+            .unwrap()
     }
 }

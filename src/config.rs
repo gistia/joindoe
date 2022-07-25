@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::transformer::{
     DateTransformer, EmailTransformer, FirstNameTransformer, FromTransformer, LastNameTransformer,
-    NullTransformer, RegexTransformer, ReverseTransformer, SequenceTransformer, Transformer,
+    NullTransformer, RandomTransformer, RegexTransformer, ReverseTransformer, SequenceTransformer,
+    Transformer,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -18,7 +19,9 @@ pub struct Config {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct PdfConfig {
     pub bucket: String,
+    pub font: String,
     pub from: String,
+    pub contents: String,
     pub file_name: String,
     pub aws_access_key_id: String,
     pub aws_secret_access_key: String,
@@ -80,6 +83,12 @@ pub struct DateOptions {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RandomOptions {
+    pub range_start: usize,
+    pub range_end: usize,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "transformer", content = "properties")]
 pub enum TransformerType {
@@ -92,6 +101,7 @@ pub enum TransformerType {
     Email,
     From(FromOptions),
     Date(DateOptions),
+    Random(RandomOptions),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -113,6 +123,10 @@ impl TransformerType {
             TransformerType::Regex(options) => Box::new(RegexTransformer::new(&options.format)),
             TransformerType::From(options) => Box::new(FromTransformer::new(&options.column)),
             TransformerType::Date(options) => Box::new(DateTransformer::new(&options.format)),
+            TransformerType::Random(options) => Box::new(RandomTransformer::new(
+                &options.range_start,
+                &options.range_end,
+            )),
         }
     }
 }

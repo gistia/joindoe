@@ -85,7 +85,7 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
 
         let elapsed = now.elapsed();
         log::info!(
-            "Finished collecting {} in {}.{:02}s",
+            "Finished transforming {} in {}.{:02}s",
             table,
             elapsed.as_secs(),
             elapsed.subsec_micros()

@@ -1,3 +1,4 @@
 /target
 *.parquet
 .env
+.DS_Store
