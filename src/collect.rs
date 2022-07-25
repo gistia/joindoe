@@ -29,6 +29,12 @@ pub async fn collect(config: &Config) -> Result<(), Error> {
             log::debug!("Processing table {} with {} rows", table, count);
 
             if let Some(from) = &table_def.from {
+                let db = Db::new(&config.destination.connection_uri).await;
+                log::debug!(
+                    "Connecting to target: postgres://*****@{}",
+                    db.sanitized_uri()
+                );
+
                 db.unload(&from, &config.store.bucket, table).await.unwrap();
             } else {
                 db.unload_table(&table, &config.store.bucket).await.unwrap();
