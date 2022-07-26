@@ -1,6 +1,5 @@
-use fake::{faker::internet::en::FreeEmail, Fake};
-
 use super::{TransformationContext, Transformer};
+use fake::{faker::internet::en::FreeEmail, Fake};
 
 pub struct EmailTransformer {}
 

@@ -33,10 +33,14 @@ pub async fn transform(config: &Config) -> Result<(), Error> {
             transform = v;
         }
 
-        let columns = db::Db::new(&config.source.connection_uri)
-            .await
-            .columns(&table)
-            .await?;
+        let columns = if let Some(columns) = &table_obj.columns {
+            columns.clone()
+        } else {
+            db::Db::new(&config.source.connection_uri)
+                .await
+                .columns(&table)
+                .await?
+        };
         let now = Instant::now();
 
         let results = bucket

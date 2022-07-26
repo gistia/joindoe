@@ -18,6 +18,12 @@ pub async fn run(config: &Config) -> Result<(), Error> {
             log::debug!("{:#?}", task_def.task);
 
             match &task_def.task {
+                TaskType::Sql(sql_config) => {
+                    let db = Db::new(&sql_config.connection_uri).await;
+                    log::debug!("Running SQL: {}", sql_config.sql);
+                    let results = db.exec(&sql_config.sql).await.unwrap();
+                    log::debug!("{} affected records", results);
+                }
                 TaskType::Pdf(pdf_config) => {
                     let credentials = Credentials::new(
                         Some(&pdf_config.aws_access_key_id.clone()),
@@ -31,7 +37,6 @@ pub async fn run(config: &Config) -> Result<(), Error> {
                     let region = "us-east-1".parse().unwrap();
                     let bucket = Bucket::new(&pdf_config.bucket, region, credentials).unwrap();
 
-                    println!("PDF task: {:#?}", pdf_config);
                     let client = Db::new(&config.destination.connection_uri).await;
                     let mut handlebars = Handlebars::new();
                     handlebars

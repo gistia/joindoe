@@ -3,9 +3,10 @@ use std::{env, fs};
 use serde::{Deserialize, Serialize};
 
 use crate::transformer::{
-    DateTransformer, EmailTransformer, FirstNameTransformer, FromTransformer, LastNameTransformer,
-    NullTransformer, RandomTransformer, RegexTransformer, ReverseTransformer, SequenceTransformer,
-    Transformer,
+    CityTransformer, DateTransformer, EmailTransformer, FirstNameTransformer, FromTransformer,
+    LastNameTransformer, NullTransformer, RandomTransformer, RandomValueTransformer,
+    RegexTransformer, ReverseTransformer, SequenceTransformer, StateTransformer, StaticTransformer,
+    StreetTransformer, Transformer, ZipCodeTransformer,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -28,6 +29,12 @@ pub struct PdfConfig {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct SqlConfig {
+    pub sql: String,
+    pub connection_uri: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct PostProcessTask {
     pub name: String,
     #[serde(flatten)]
@@ -44,6 +51,8 @@ pub struct Transformation {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Table {
     pub name: String,
+    pub columns: Option<Vec<String>>,
+    pub limit: Option<usize>,
     pub generate: Option<usize>,
     pub from: Option<String>,
     pub transform: Option<Vec<Transformation>>,
@@ -89,6 +98,16 @@ pub struct RandomOptions {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct StaticOptions {
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RandomValueOptions {
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 #[serde(tag = "transformer", content = "properties")]
 pub enum TransformerType {
@@ -99,9 +118,15 @@ pub enum TransformerType {
     FirstName,
     LastName,
     Email,
+    Street,
+    City,
+    State,
+    ZipCode,
     From(FromOptions),
     Date(DateOptions),
     Random(RandomOptions),
+    Static(StaticOptions),
+    RandomValue(RandomValueOptions),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -109,6 +134,7 @@ pub enum TransformerType {
 #[serde(tag = "task", content = "properties")]
 pub enum TaskType {
     Pdf(PdfConfig),
+    Sql(SqlConfig),
 }
 
 impl TransformerType {
@@ -120,6 +146,10 @@ impl TransformerType {
             TransformerType::LastName => Box::new(LastNameTransformer::default()),
             TransformerType::Sequence => Box::new(SequenceTransformer::default()),
             TransformerType::Email => Box::new(EmailTransformer::default()),
+            TransformerType::Street => Box::new(StreetTransformer::default()),
+            TransformerType::City => Box::new(CityTransformer::default()),
+            TransformerType::State => Box::new(StateTransformer::default()),
+            TransformerType::ZipCode => Box::new(ZipCodeTransformer::default()),
             TransformerType::Regex(options) => Box::new(RegexTransformer::new(&options.format)),
             TransformerType::From(options) => Box::new(FromTransformer::new(&options.column)),
             TransformerType::Date(options) => Box::new(DateTransformer::new(&options.format)),
@@ -127,6 +157,10 @@ impl TransformerType {
                 &options.range_start,
                 &options.range_end,
             )),
+            TransformerType::Static(options) => Box::new(StaticTransformer::new(&options.value)),
+            TransformerType::RandomValue(options) => {
+                Box::new(RandomValueTransformer::new(&options.values))
+            }
         }
     }
 }

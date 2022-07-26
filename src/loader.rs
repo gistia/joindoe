@@ -16,7 +16,11 @@ pub async fn load(config: &Config) -> Result<(), Error> {
     for table in &src_def.tables {
         log::info!("Loading table {}...", table.name);
         let now = Instant::now();
-        let columns = source.columns(&table.name).await.unwrap();
+        let columns = if let Some(columns) = &table.columns {
+            columns.clone()
+        } else {
+            source.columns(&table.name).await.unwrap()
+        };
 
         let sql = format!(
             r#"

@@ -10,10 +10,7 @@ use tokio_postgres::Error;
 pub async fn collect(config: &Config) -> Result<(), Error> {
     let source = &config.source;
     let db = Db::new(&source.connection_uri).await;
-    log::debug!(
-        "Connecting to source: postgres://*****@{}",
-        db.sanitized_uri()
-    );
+    log::debug!("Connecting to source database");
 
     for table_def in &source.tables {
         let table = &table_def.name;
@@ -30,14 +27,13 @@ pub async fn collect(config: &Config) -> Result<(), Error> {
 
             if let Some(from) = &table_def.from {
                 let db = Db::new(&config.destination.connection_uri).await;
-                log::debug!(
-                    "Connecting to target: postgres://*****@{}",
-                    db.sanitized_uri()
-                );
+                log::debug!("Connecting to target database");
 
                 db.unload(&from, &config.store.bucket, table).await.unwrap();
             } else {
-                db.unload_table(&table, &config.store.bucket).await.unwrap();
+                db.unload_table(&table, &table_def.limit, &config.store.bucket)
+                    .await
+                    .unwrap();
             }
         }
         let elapsed = now.elapsed();

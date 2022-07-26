@@ -8,6 +8,12 @@ pub struct Db {
 
 impl Db {
     pub async fn new(uri: &str) -> Self {
+        let sanitized_uri = format!(
+            "postgres://*****:*****@{}",
+            uri.split("@").collect::<Vec<_>>()[1]
+        );
+        log::debug!("Connecting to {}...", sanitized_uri);
+
         let (client, connection) = tokio_postgres::connect(uri, NoTls).await.unwrap();
 
         tokio::spawn(async move {
@@ -52,10 +58,24 @@ impl Db {
         Ok(columns.iter().map(|row| row.get(0)).collect())
     }
 
-    pub async fn unload_table(&self, table: &str, to_bucket: &str) -> Result<u64, Error> {
+    pub async fn unload_table(
+        &self,
+        table: &str,
+        limit: &Option<usize>,
+        to_bucket: &str,
+    ) -> Result<u64, Error> {
         let columns = self.columns(table).await?;
-        let sql = format!("SELECT {} FROM {}", columns.join(", "), table);
-        println!(" *** SQL = {}", sql);
+        let sql = if let Some(limit) = limit {
+            format!(
+                "SELECT * FROM (SELECT {} FROM {} LIMIT {})",
+                columns.join(", "),
+                table,
+                limit
+            )
+        } else {
+            format!("SELECT {} FROM {}", columns.join(", "), table)
+        };
+        log::debug!("SQL[{}] = {}", table, sql);
         self.unload(&sql, to_bucket, table).await
     }
 
@@ -74,6 +94,7 @@ impl Db {
             env::var("AWS_SECRET_ACCESS_KEY").unwrap()
         );
 
+        log::debug!("SQL = {}", sql);
         Ok(self.client.execute(sql, &[]).await?)
     }
 
