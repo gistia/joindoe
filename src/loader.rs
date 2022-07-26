@@ -1,8 +1,9 @@
 use crate::config::Config;
 use crate::db::Db;
 use std::time::Instant;
+use tokio_postgres::Error;
 
-pub async fn load(config: &Config) {
+pub async fn load(config: &Config) -> Result<(), Error> {
     let src_def = &config.source;
     let source = Db::new(&src_def.connection_uri).await;
     let destination = Db::new(&config.destination.connection_uri).await;
@@ -15,7 +16,11 @@ pub async fn load(config: &Config) {
     for table in &src_def.tables {
         log::info!("Loading table {}...", table.name);
         let now = Instant::now();
-        let columns = source.columns(&table.name).await.unwrap();
+        let columns = if let Some(columns) = &table.columns {
+            columns.clone()
+        } else {
+            source.columns(&table.name).await.unwrap()
+        };
 
         let sql = format!(
             r#"
@@ -35,9 +40,8 @@ pub async fn load(config: &Config) {
 
         destination
             .exec(format!("TRUNCATE TABLE {}", table.name).as_str())
-            .await
-            .unwrap();
-        destination.exec(&sql).await.unwrap();
+            .await?;
+        destination.exec(&sql).await?;
 
         let elapsed = now.elapsed();
         log::info!(
@@ -47,4 +51,5 @@ pub async fn load(config: &Config) {
             elapsed.subsec_micros()
         );
     }
+    Ok(())
 }

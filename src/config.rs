@@ -3,8 +3,43 @@ use std::{env, fs};
 use serde::{Deserialize, Serialize};
 
 use crate::transformer::{
-    FirstNameTransformer, LastNameTransformer, ReverseTransformer, Transformer,
+    CityTransformer, DateTransformer, EmailTransformer, FirstNameTransformer, FromTransformer,
+    LastNameTransformer, NullTransformer, RandomTransformer, RandomValueTransformer,
+    RegexTransformer, ReverseTransformer, SequenceTransformer, StateTransformer, StaticTransformer,
+    StreetTransformer, Transformer, ZipCodeTransformer,
 };
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Config {
+    pub source: Source,
+    pub store: Store,
+    pub destination: Destination,
+    pub postprocess: Option<Vec<PostProcessTask>>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct PdfConfig {
+    pub bucket: String,
+    pub font: String,
+    pub from: String,
+    pub contents: String,
+    pub file_name: String,
+    pub aws_access_key_id: String,
+    pub aws_secret_access_key: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct SqlConfig {
+    pub sql: String,
+    pub connection_uri: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct PostProcessTask {
+    pub name: String,
+    #[serde(flatten)]
+    pub task: TaskType,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Transformation {
@@ -16,6 +51,10 @@ pub struct Transformation {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Table {
     pub name: String,
+    pub columns: Option<Vec<String>>,
+    pub limit: Option<usize>,
+    pub generate: Option<usize>,
+    pub from: Option<String>,
     pub transform: Option<Vec<Transformation>>,
 }
 
@@ -37,28 +76,91 @@ pub struct Destination {
     pub connection_uri: String,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Config {
-    pub source: Source,
-    pub store: Store,
-    pub destination: Destination,
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RegexOptions {
+    pub format: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct FromOptions {
+    pub column: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct DateOptions {
+    pub format: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RandomOptions {
+    pub range_start: usize,
+    pub range_end: usize,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct StaticOptions {
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RandomValueOptions {
+    pub values: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
-#[serde(tag = "transformer")]
+#[serde(tag = "transformer", content = "properties")]
 pub enum TransformerType {
+    Null,
+    Sequence,
     Reverse,
+    Regex(RegexOptions),
     FirstName,
     LastName,
+    Email,
+    Street,
+    City,
+    State,
+    ZipCode,
+    From(FromOptions),
+    Date(DateOptions),
+    Random(RandomOptions),
+    Static(StaticOptions),
+    RandomValue(RandomValueOptions),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(tag = "task", content = "properties")]
+pub enum TaskType {
+    Pdf(PdfConfig),
+    Sql(SqlConfig),
 }
 
 impl TransformerType {
     pub fn transformer(&self) -> Box<dyn Transformer> {
         match self {
+            TransformerType::Null => Box::new(NullTransformer::default()),
             TransformerType::Reverse => Box::new(ReverseTransformer::default()),
             TransformerType::FirstName => Box::new(FirstNameTransformer::default()),
             TransformerType::LastName => Box::new(LastNameTransformer::default()),
+            TransformerType::Sequence => Box::new(SequenceTransformer::default()),
+            TransformerType::Email => Box::new(EmailTransformer::default()),
+            TransformerType::Street => Box::new(StreetTransformer::default()),
+            TransformerType::City => Box::new(CityTransformer::default()),
+            TransformerType::State => Box::new(StateTransformer::default()),
+            TransformerType::ZipCode => Box::new(ZipCodeTransformer::default()),
+            TransformerType::Regex(options) => Box::new(RegexTransformer::new(&options.format)),
+            TransformerType::From(options) => Box::new(FromTransformer::new(&options.column)),
+            TransformerType::Date(options) => Box::new(DateTransformer::new(&options.format)),
+            TransformerType::Random(options) => Box::new(RandomTransformer::new(
+                &options.range_start,
+                &options.range_end,
+            )),
+            TransformerType::Static(options) => Box::new(StaticTransformer::new(&options.value)),
+            TransformerType::RandomValue(options) => {
+                Box::new(RandomValueTransformer::new(&options.values))
+            }
         }
     }
 }
@@ -77,7 +179,11 @@ fn replace_env_vars(s: &str) -> String {
 impl Config {
     pub fn new(file: &str) -> Self {
         let config_str = replace_env_vars(&fs::read_to_string(file).unwrap());
-        serde_yaml::from_str(&config_str).unwrap()
+        Self::new_from_str(&config_str)
+    }
+
+    pub fn new_from_str(s: &str) -> Self {
+        serde_yaml::from_str(s).unwrap()
     }
 }
 
@@ -87,8 +193,91 @@ mod tests {
 
     #[test]
     fn test_config() {
-        let config = Config::new("config.yml");
+        let str = indoc::indoc! {r#"
+source:
+  connection_uri: $DATABASE_URL
+  tables:
+    - name: patient_master_record
+      generate: 100
+      transform:
+        - column: id
+          transformer: sequence
+        - column: external_id
+          transformer: regex
+          properties:
+            format: /[0-9]{12}/
+        - column: internal_id
+          transformer: regex
+          properties:
+            format: /[0-9]{12}/
+        - column: first_name
+          transformer: first-name
+        - column: last_name
+          transformer: last-name
+        - column: ssn
+          transformer: regex
+          properties:
+            format: /[0-9]{3}-[0-9]{2}-[0-9]{4}/
+        - column: date_of_birth
+          transformer: date
+          properties:
+            format: '%Y-%m-%d'
+        - column: email
+          transformer: email
+    - name: patient
+      from: SELECT id, external_id, internal_id, first_name, last_name, ssn, date_of_birth, email FROM patient_master_record
+      transform:
+        - column: id
+          transformer: sequence
+        - column: external_id
+          transformer: from
+          properties:
+            column: id
+    - name: providers
+      transform:
+          - column: identifier
+            transformer: reverse
+          - column: first_name
+            transformer: first-name
+          - column: last_name
+            transformer: last-name
+    - name: insurances
+    - name: locations
+    - name: test_definitions
+    - name: orders
+      transform:
+          - column: identifier
+            transformer: reverse
+    - name: orders_tests
+
+store:
+  bucket: nw-data-transfer
+  aws_access_key_id: $AWS_ACCESS_KEY_ID
+  aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+
+destination:
+  connection_uri: $EXP_DATABASE_URL
+
+postprocess:
+  - name: Generate results PDF
+    task: pdf
+    properties:
+      from: |
+        SELECT
+          o.identifier, ot.test_code, p.first_name, p.last_name, p.date_of_birth::text
+        FROM
+          "orders" o
+          JOIN "orders_tests" ot ON ot.order_id = o.id
+          JOIN "patients" p ON p.id = o.patient_id
+      bucket: nw-pdf
+      file_name: ""
+      aws_access_key_id: $AWS_ACCESS_KEY_ID
+      aws_secret_access_key: $AWS_SECRET_ACCESS_KEY
+        "#};
+
+        let config = Config::new_from_str(str);
         println!("{:#?}", config);
+        // assert_eq!(config.postprocess.unwrap()[0].name, "Generate results PDF");
     }
 
     #[test]
