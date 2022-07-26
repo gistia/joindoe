@@ -36,6 +36,13 @@ pub async fn run(config: &Config) -> Result<(), Error> {
 
                     let region = "us-east-1".parse().unwrap();
                     let bucket = Bucket::new(&pdf_config.bucket, region, credentials).unwrap();
+                    let results = bucket.list("".to_string(), None).await.unwrap();
+                    let contents = results
+                        .iter()
+                        .map(|r| r.contents.clone())
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    let existing_pdfs = contents.iter().map(|o| o.key.clone()).collect::<Vec<_>>();
 
                     let client = Db::new(&config.destination.connection_uri).await;
                     let mut handlebars = Handlebars::new();
@@ -57,6 +64,11 @@ pub async fn run(config: &Config) -> Result<(), Error> {
                         }
 
                         let file_name = handlebars.render("file_name", &map).unwrap();
+                        if existing_pdfs.contains(&file_name) {
+                            log::debug!("Skipping PDF - {}...", file_name);
+                            continue;
+                        }
+
                         log::trace!("Generating PDF - {} with {:#?}", file_name, &map);
 
                         let (doc, page1, layer1) =
