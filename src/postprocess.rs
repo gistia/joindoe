@@ -54,9 +54,12 @@ pub async fn run(config: &Config) -> Result<(), Error> {
                         .unwrap();
 
                     let rows = client.query(&pdf_config.from).await?;
-                    log::info!("Generating and uploading {} PDFs...", rows.len());
+                    let mut i = 0;
+                    let count = rows.len();
+                    log::info!("Generating and uploading {} PDFs...", count);
                     for row in rows {
                         let mut map = HashMap::new();
+                        i += 1;
 
                         for col in row.columns() {
                             let value: String = row.get(col.name());
@@ -65,7 +68,7 @@ pub async fn run(config: &Config) -> Result<(), Error> {
 
                         let file_name = handlebars.render("file_name", &map).unwrap();
                         if existing_pdfs.contains(&file_name) {
-                            log::debug!("Skipping PDF - {}...", file_name);
+                            log::debug!("Skipping PDF {}/{} - {}...", i, count, file_name);
                             continue;
                         }
 
@@ -86,7 +89,7 @@ pub async fn run(config: &Config) -> Result<(), Error> {
                         doc.save(&mut BufWriter::new(File::create(&path).unwrap()))
                             .unwrap();
 
-                        log::debug!("Uploading PDF - {}...", file_name);
+                        log::debug!("Uploading PDF {}/{} - {}...", i, count, file_name);
                         bucket
                             .put_object(&file_name, &std::fs::read(path).unwrap())
                             .await
