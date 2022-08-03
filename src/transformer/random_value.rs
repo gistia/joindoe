@@ -19,7 +19,7 @@ impl Transformer for RandomValueTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a value picked randomly from a list"
+        "Random value picked from a list"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

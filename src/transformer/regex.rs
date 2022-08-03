@@ -20,7 +20,7 @@ impl Transformer for RegexTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random string generated from a regular expression"
+        "Random string generated from a regular expression"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

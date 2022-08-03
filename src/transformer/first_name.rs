@@ -18,7 +18,7 @@ impl Transformer for FirstNameTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random first name"
+        "Random first name"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

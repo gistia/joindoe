@@ -1,4 +1,5 @@
-use clap::{Parser, ValueEnum};
+use clap::{AppSettings, Parser, Subcommand, ValueEnum};
+use colored::Colorize;
 
 mod collect;
 mod config;
@@ -16,12 +17,23 @@ pub enum Stage {
     Postprocess,
 }
 
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// List all available transformers
+    Transformers {},
+}
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
+#[clap(global_setting(AppSettings::SubcommandsNegateReqs))]
 struct Args {
+    /// Optional subcommand
+    #[clap(subcommand)]
+    command: Option<Commands>,
+
     /// Configuration file
-    #[clap(short, long)]
-    config: String,
+    #[clap(short, long, value_name = "FILE", required = true)]
+    config: Option<String>,
 
     /// Skip the collection stage
     #[clap(long)]
@@ -49,7 +61,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> () {
+async fn main() {
     dotenv::dotenv().ok();
 
     let args = Args::parse();
@@ -60,7 +72,20 @@ async fn main() -> () {
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level),
     );
 
-    let config = config::Config::new(&args.config);
+    match &args.command {
+        Some(Commands::Transformers {}) => {
+            let transformers = transformer::transformers_info();
+            println!("{}", "TRANSFORMERS:".yellow().bold());
+            for transformer in transformers {
+                println!("    {: <20}{}", transformer.0.green(), transformer.1);
+            }
+            return;
+        }
+        None => {}
+    }
+
+    let config = args.config.unwrap();
+    let config = config::Config::new(&config);
     if !args.skip_collect && allow_run(&args.only, Stage::Collect) {
         match collect::collect(&config).await {
             Ok(_) => log::info!("Collection phase completed"),

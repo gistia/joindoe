@@ -15,7 +15,7 @@ impl Transformer for CityTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random city name"
+        "Random city name"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

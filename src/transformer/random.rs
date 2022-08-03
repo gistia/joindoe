@@ -21,7 +21,7 @@ impl Transformer for RandomTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random value defined by a range"
+        "Random value defined by a range"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

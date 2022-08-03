@@ -15,7 +15,7 @@ impl Transformer for EmailTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random email address"
+        "Random email address"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

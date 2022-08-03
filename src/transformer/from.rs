@@ -18,7 +18,7 @@ impl Transformer for FromTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field using another column as its source"
+        "Replaces field using another column as its source"
     }
 
     fn transform(&self, ctx: &TransformationContext) -> String {

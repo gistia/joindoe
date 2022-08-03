@@ -14,7 +14,7 @@ impl Transformer for NullTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a null value"
+        "Null value"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

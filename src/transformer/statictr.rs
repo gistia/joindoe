@@ -18,7 +18,7 @@ impl Transformer for StaticTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a fixed value for all records"
+        "Fixed value for all records"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

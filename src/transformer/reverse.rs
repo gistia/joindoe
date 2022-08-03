@@ -15,7 +15,7 @@ impl Transformer for ReverseTransformer {
     }
 
     fn description(&self) -> &str {
-        "Reverse the contents of the field"
+        "Reverses the contents of the field"
     }
 
     fn transform(&self, ctx: &TransformationContext) -> String {

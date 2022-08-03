@@ -21,7 +21,7 @@ impl Transformer for DateTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the random formatted date/time"
+        "Random formatted date/time"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

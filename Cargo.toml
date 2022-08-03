@@ -10,6 +10,7 @@ version = "0.1.1"
 [dependencies]
 chrono = "0.4"
 clap = {version = "3.2.8", features = ["derive"]}
+colored = "2.0"
 csv = "1.1"
 dotenv = "0.15"
 env_logger = "0.9.0"

@@ -40,8 +40,5 @@ destination:
 
 This config processes two tables from the source database: `providers` and `orders`. It then modifies a couple of fields using a given transformer, stores it on an S3 bucket and then uploads it to the destination database.
 
-The supported transformers are:
+The supported transformers can be listed using `joindoe transformers`.
 
-  - `reverse`: reverses the contents of the field
-  - `first-name`: replaces the contents of the field by a random first name
-  - `last-name`: replaces the contents of the field by a random last name

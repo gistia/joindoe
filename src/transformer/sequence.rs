@@ -14,7 +14,7 @@ impl Transformer for SequenceTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a sequential value"
+        "Sequential value"
     }
 
     fn transform(&self, ctx: &TransformationContext) -> String {

@@ -15,7 +15,7 @@ impl Transformer for StateTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random state abbreviation"
+        "Random state abbreviation"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

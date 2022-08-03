@@ -16,7 +16,7 @@ impl Transformer for StreetTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random street address"
+        "Random street address"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {

@@ -15,7 +15,7 @@ impl Transformer for ZipCodeTransformer {
     }
 
     fn description(&self) -> &str {
-        "Replaces the content of the field with a random zipcode abbreviation"
+        "Random zipcode abbreviation"
     }
 
     fn transform(&self, _: &TransformationContext) -> String {
