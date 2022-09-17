@@ -9,16 +9,23 @@ use tokio_postgres::Error;
 
 pub async fn collect(config: &Config) -> Result<(), Error> {
     let source = &config.source;
+    let schema = source.schema.clone();
+    let schema = schema.unwrap_or("public".to_string());
     let db = Db::new(&source.connection_uri).await;
     log::debug!("Connecting to source database");
 
     for table_def in &source.tables {
         let table = &table_def.name;
-        log::debug!("Started processing table {}", table);
+        log::debug!("Started processing table {}.{}", schema, table);
 
         let now = Instant::now();
         if let Some(count) = &table_def.generate {
-            log::debug!("Generating new table {} with {} rows", table, count);
+            log::debug!(
+                "Generating new table {}.{} with {} rows",
+                schema,
+                table,
+                count
+            );
 
             generate_csv(&config, &table_def, count).await;
         } else {
@@ -31,7 +38,7 @@ pub async fn collect(config: &Config) -> Result<(), Error> {
 
                 db.unload(&from, &config.store.bucket, table).await.unwrap();
             } else {
-                db.unload_table(&table, &table_def.limit, &config.store.bucket)
+                db.unload_table(&schema, &table, &table_def.limit, &config.store.bucket)
                     .await
                     .unwrap();
             }

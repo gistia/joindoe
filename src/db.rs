@@ -60,22 +60,24 @@ impl Db {
 
     pub async fn unload_table(
         &self,
+        schema: &str,
         table: &str,
         limit: &Option<usize>,
         to_bucket: &str,
     ) -> Result<u64, Error> {
         let columns = self.columns(table).await?;
+        let qualified_table = format!(r#""{}"."{}""#, schema, table);
         let sql = if let Some(limit) = limit {
             format!(
                 "SELECT * FROM (SELECT {} FROM {} LIMIT {})",
                 columns.join(", "),
-                table,
+                qualified_table,
                 limit
             )
         } else {
-            format!("SELECT {} FROM {}", columns.join(", "), table)
+            format!("SELECT {} FROM {}", columns.join(", "), qualified_table)
         };
-        log::debug!("SQL[{}] = {}", table, sql);
+        log::debug!("SQL[{}] = {}", qualified_table, sql);
         self.unload(&sql, to_bucket, table).await
     }
 

@@ -61,6 +61,7 @@ pub struct Table {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Source {
     pub connection_uri: String,
+    pub schema: Option<String>,
     pub tables: Vec<Table>,
 }
 
